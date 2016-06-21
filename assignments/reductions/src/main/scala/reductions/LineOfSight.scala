@@ -3,8 +3,10 @@ package reductions
 import org.scalameter._
 import common._
 
+import scala.math
+
 object LineOfSightRunner {
-  
+
   val standardConfig = config(
     Key.exec.minWarmupRuns -> 40,
     Key.exec.maxWarmupRuns -> 80,
@@ -34,7 +36,15 @@ object LineOfSight {
   def max(a: Float, b: Float): Float = if (a > b) a else b
 
   def lineOfSight(input: Array[Float], output: Array[Float]): Unit = {
-    ???
+    def eval(ix: Int, prevMax: Float): Unit = {
+      if (ix < input.length) {
+        val angle: Float = input(ix) / ix
+        output(ix) = math.max(angle, prevMax)
+        eval(ix + 1, output(ix))
+      }
+    }
+    output(0) = 0
+    eval(1, 0)
   }
 
   sealed abstract class Tree {
@@ -48,45 +58,73 @@ object LineOfSight {
   case class Leaf(from: Int, until: Int, maxPrevious: Float) extends Tree
 
   /** Traverses the specified part of the array and returns the maximum angle.
-   */
+    */
   def upsweepSequential(input: Array[Float], from: Int, until: Int): Float = {
-    ???
+    def eval(ix: Int, max: Float): Float = {
+      if (ix >= until)
+        max
+      else {
+        eval(ix + 1, math.max(max, input(ix) / ix))
+      }
+    }
+
+    eval(from, 0)
   }
 
   /** Traverses the part of the array starting at `from` and until `end`, and
-   *  returns the reduction tree for that part of the array.
-   *
-   *  The reduction tree is a `Leaf` if the length of the specified part of the
-   *  array is smaller or equal to `threshold`, and a `Node` otherwise.
-   *  If the specified part of the array is longer than `threshold`, then the
-   *  work is divided and done recursively in parallel.
-   */
+    * returns the reduction tree for that part of the array.
+    *
+    * The reduction tree is a `Leaf` if the length of the specified part of the
+    * array is smaller or equal to `threshold`, and a `Node` otherwise.
+    * If the specified part of the array is longer than `threshold`, then the
+    * work is divided and done recursively in parallel.
+    */
   def upsweep(input: Array[Float], from: Int, end: Int,
-    threshold: Int): Tree = {
-    ???
+              threshold: Int): Tree = {
+    if (end - from <= threshold) {
+      Leaf(from, end, upsweepSequential(input, from, end))
+    }
+    else {
+      val mid = from + (end - from) / 2
+      val (left, right) = parallel(upsweep(input, from, mid, threshold), upsweep(input, mid, end, threshold))
+      Node(left, right)
+    }
   }
 
   /** Traverses the part of the `input` array starting at `from` and until
-   *  `until`, and computes the maximum angle for each entry of the output array,
-   *  given the `startingAngle`.
-   */
+    * `until`, and computes the maximum angle for each entry of the output array,
+    * given the `startingAngle`.
+    */
   def downsweepSequential(input: Array[Float], output: Array[Float],
-    startingAngle: Float, from: Int, until: Int): Unit = {
-    ???
+                          startingAngle: Float, from: Int, until: Int): Unit = {
+    def eval(ix: Int, angle: Float): Unit = {
+      if (ix < until) {
+        output(ix) = math.max(angle, input(ix) / ix)
+        eval(ix + 1, output(ix))
+      }
+    }
+
+    eval(from, startingAngle)
   }
 
   /** Pushes the maximum angle in the prefix of the array to each leaf of the
-   *  reduction `tree` in parallel, and then calls `downsweepTraverse` to write
-   *  the `output` angles.
-   */
+    * reduction `tree` in parallel, and then calls `downsweepTraverse` to write
+    * the `output` angles.
+    */
   def downsweep(input: Array[Float], output: Array[Float], startingAngle: Float,
-    tree: Tree): Unit = {
-    ???
+                tree: Tree): Unit = {
+    tree match {
+      case Node(left, right) => parallel(downsweep(input, output, startingAngle, left),
+        downsweep(input, output, math.max(startingAngle, left.maxPrevious), right))
+      case Leaf(from, until, _) => downsweepSequential(input, output, startingAngle, from, until)
+    }
   }
 
   /** Compute the line-of-sight in parallel. */
   def parLineOfSight(input: Array[Float], output: Array[Float],
-    threshold: Int): Unit = {
-    ???
+                     threshold: Int): Unit = {
+    val tree = upsweep(input, 1, input.length, math.max(2, input.length / 32))
+    downsweep(input, output, 0, tree)
+    output(0) = 0f
   }
 }
