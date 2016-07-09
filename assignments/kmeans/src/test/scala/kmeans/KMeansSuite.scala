@@ -1,15 +1,13 @@
 package kmeans
 
-import java.util.concurrent._
-import scala.collection._
-import org.scalatest.FunSuite
 import org.junit.runner.RunWith
+import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
-import common._
-import scala.math._
+
+import scala.collection._
 
 object KM extends KMeans
-import KM._
+import kmeans.KM._
 
 @RunWith(classOf[JUnitRunner])
 class KMeansSuite extends FunSuite {
@@ -24,6 +22,13 @@ class KMeansSuite extends FunSuite {
     val means: GenSeq[Point] = IndexedSeq()
     val expected = GenMap[Point, GenSeq[Point]]()
     checkClassify(points, means, expected)
+  }
+
+  test("failed test 1") {
+    val points = GenSeq(new Point(0, 0, 1), new Point(0,0, -1), new Point(0,1,0), new Point(0,10,0))
+    val oldMeans = GenSeq(new Point(0, -1, 0), new Point(0, 2, 0))
+    val eta = 12.25
+    print(kMeans(points, oldMeans, eta))
   }
 
   test("'classify' should work for empty 'points' and 'means' == GenSeq(Point(1,1,1))") {
