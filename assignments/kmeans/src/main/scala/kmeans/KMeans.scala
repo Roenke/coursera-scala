@@ -1,10 +1,10 @@
 package kmeans
 
+import org.scalameter._
+
 import scala.annotation.tailrec
 import scala.collection._
 import scala.util.Random
-import org.scalameter._
-import common._
 
 class KMeans {
 
@@ -27,9 +27,9 @@ class KMeans {
   }
 
   def findClosest(p: Point, means: GenSeq[Point]): Point = {
-    assert(means.size > 0)
-    var minDistance = p.squareDistance(means(0))
-    var closest = means(0)
+    assert(means.nonEmpty)
+    var minDistance = p.squareDistance(means.head)
+    var closest = means.head
     var i = 1
     while (i < means.length) {
       val distance = p.squareDistance(means(i))
@@ -43,10 +43,10 @@ class KMeans {
   }
 
   def classify(points: GenSeq[Point], means: GenSeq[Point]): GenMap[Point, GenSeq[Point]] = {
-    ???
+    means.map((point: Point) => point -> Seq()).toMap ++ points.groupBy((point: Point) => findClosest(point, means))
   }
 
-  def findAverage(oldMean: Point, points: GenSeq[Point]): Point = if (points.length == 0) oldMean else {
+  def findAverage(oldMean: Point, points: GenSeq[Point]): Point = if (points.isEmpty) oldMean else {
     var x = 0.0
     var y = 0.0
     var z = 0.0
@@ -59,16 +59,22 @@ class KMeans {
   }
 
   def update(classified: GenMap[Point, GenSeq[Point]], oldMeans: GenSeq[Point]): GenSeq[Point] = {
-    ???
+    classified.zip(oldMeans)
+      .map((zipped: ((Point, GenSeq[Point]), Point)) => findAverage(zipped._2, zipped._1._2))
+      .toSeq
   }
 
   def converged(eta: Double)(oldMeans: GenSeq[Point], newMeans: GenSeq[Point]): Boolean = {
-    ???
+    val delta = oldMeans.zip(newMeans).foldLeft(0.0)((d: Double, points: (Point, Point)) =>
+      d + points._1.squareDistance(points._2))
+
+    Math.sqrt(delta) < eta
   }
 
   @tailrec
   final def kMeans(points: GenSeq[Point], means: GenSeq[Point], eta: Double): GenSeq[Point] = {
-    if (???) kMeans(???, ???, ???) else ??? // your implementation need to be tail recursive
+    val newMeans = update(classify(points, means), means)
+    if (converged(eta)(means, newMeans)) kMeans(points, newMeans, eta) else newMeans // your implementation need to be tail recursive
   }
 }
 
@@ -93,7 +99,7 @@ object KMeansRunner {
     Key.exec.maxWarmupRuns -> 40,
     Key.exec.benchRuns -> 25,
     Key.verbose -> true
-  ) withWarmer(new Warmer.Default)
+  ) withWarmer new Warmer.Default
 
   def main(args: Array[String]) {
     val kMeans = new KMeans()
